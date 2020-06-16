@@ -28,7 +28,7 @@ def restart(app, key):
 def run():
     db = connect()
     db.execute('SELECT appname, usertoken from apps where active = True')
-    apps = db.fetchAll()
+    apps = db.fetchall()
     for app in apps:
         restart(app.appname, app.usertoken)
     db.close()
