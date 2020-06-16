@@ -27,10 +27,10 @@ def restart(app, key):
 
 def run():
     db = connect()
-    db.execute('SELECT appname, key from apps where active = True')
+    db.execute('SELECT appname, usertoken from apps where active = True')
     apps = db.fetchAll()
     for app in apps:
-        restart(app.appname, app.key)
+        restart(app.appname, app.usertoken)
     db.close()
 
 if __name__ == '__main__':
