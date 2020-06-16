@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 def connect():
-    if os.getenv('TEST'):
+    if os.getenv('TEST') == 'TRUE':
         db = pg.connect(user=os.getenv('DB_USER'),
                         password=os.getenv('DB_PASSWORD'),
                         host=os.getenv('DB_HOST'),
@@ -30,7 +30,7 @@ def run():
     db.execute('SELECT appname, usertoken from apps where active = True')
     apps = db.fetchall()
     for app in apps:
-        restart(app.appname, app.usertoken)
+        restart(app[0], app[1])
     db.close()
 
 if __name__ == '__main__':
