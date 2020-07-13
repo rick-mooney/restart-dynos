@@ -19,18 +19,37 @@ def connect():
     return db.cursor()
 
 
-def restart(app, key):
+def restart(appname, key):
     conn = hk.from_key(key)
-    app = conn.app(app)
-    res = app.restart()
-    print(res)
+    app = conn.app(appname)
+    dynos_restarted = 0
+    for dyno in app.dynos():
+        if dyno.type == 'web':
+            dyno.restart()
+            dynos_restarted += 1
+    print('restarted ' + str(dynos_restarted) + ' dynos on app: ' + appname)
+
+    # return app.restart() # restarts the whole dyno formation. returns a tuple of app name and key for some reason
 
 def run():
     db = connect()
-    db.execute('SELECT appname, usertoken from apps where active = True')
+    columns = {
+        "appname" : 0,
+        "usertoken": 1
+    }
+    query = 'SELECT ' + ', '.join(columns.keys()) + ' FROM apps WHERE active = True'
+    print(query)
+    db.execute(query)
     apps = db.fetchall()
     for app in apps:
-        restart(app[0], app[1])
+        print('restarting ' + app[columns['appname']] + '...')
+        try:
+            restart(app[columns['appname']], app[columns['usertoken']])
+        except Exception as ex:
+            # even if the dynos are off, its still a success. So this should just catch programming errors on my end.
+            print('error restarting app: ' + app[columns['appname']])
+            print(ex)
+    print('all apps restarted.  Shutting down...')
     db.close()
 
 if __name__ == '__main__':

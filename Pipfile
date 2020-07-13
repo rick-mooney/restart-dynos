@@ -7,7 +7,7 @@ verify_ssl = true
 
 [packages]
 heroku3 = "*"
-psycopg2 = "*"
+psycopg2-binary = "*"
 python-dotenv = "*"
 
 [requires]
