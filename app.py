@@ -1,8 +1,19 @@
 import heroku3 as hk
 import psycopg2 as pg
+from psycopg2 import extras as pg_extras
 import os
 from dotenv import load_dotenv
+from datetime import datetime, timedelta
 load_dotenv()
+
+# legacy, previously was not using dict cursor
+columns = {
+    "appname" : 0,
+    "usertoken": 1,
+    "last_restart": 2,
+    "frequency": 3,
+    "next_run" : 4
+}
 
 def connect():
     if os.getenv('TEST') == 'TRUE':
@@ -16,7 +27,7 @@ def connect():
         DATABASE_URL = os.environ.get('DATABASE_URL')
         db = pg.connect(DATABASE_URL, sslmode='require')
 
-    return db.cursor()
+    return db
 
 
 def restart(appname, key):
@@ -33,24 +44,29 @@ def restart(appname, key):
 
 def run():
     db = connect()
-    columns = {
-        "appname" : 0,
-        "usertoken": 1
-    }
-    query = 'SELECT ' + ', '.join(columns.keys()) + ' FROM apps WHERE active = True'
+    cur = db.cursor(cursor_factory=pg_extras.DictCursor)
+    query = 'SELECT ' + ', '.join(columns.keys()) + ' FROM apps WHERE active = True and next_run <= NOW()'
     print(query)
-    db.execute(query)
-    apps = db.fetchall()
+    cur.execute(query)
+    apps = cur.fetchall()
+    restarted_apps = []
     for app in apps:
-        print('restarting ' + app[columns['appname']] + '...')
+        print('restarting ' + app['appname'] + '...')
         try:
-            restart(app[columns['appname']], app[columns['usertoken']])
+            restart(app['appname'], app['usertoken'])
+            restarted_apps.append((app['appname'], datetime.now(), datetime.now() + timedelta(hours=app['frequency'])))
         except Exception as ex:
             # even if the dynos are off, its still a success. So this should just catch programming errors on my end.
-            print('error restarting app: ' + app[columns['appname']])
+            print('error restarting app: ' + app['appname'])
             print(ex)
+
+    # update app next run times
+    update_statement = """ UPDATE apps SET last_restart = data.restarted,next_run = data.next FROM (VALUES %s) AS data (name, restarted, next) WHERE appname = data.name"""
+    print(update_statement)
+    pg_extras.execute_values(cur, update_statement, restarted_apps)
+    db.commit()
     print('all apps restarted.  Shutting down...')
-    db.close()
+    cur.close()
 
 if __name__ == '__main__':
     run()
